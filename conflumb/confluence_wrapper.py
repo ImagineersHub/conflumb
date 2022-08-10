@@ -1,6 +1,7 @@
 import glob
 import os
 import re
+from typing import List
 
 import markdown
 from requests.auth import HTTPBasicAuth
@@ -18,13 +19,10 @@ class ConfluenceWrapper(metaclass=Singleton):
 
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, url: str, token: str):
+        ConfluenceAPI(url=url, token=token)
 
-    def credential(self, user: str, token: str):
-        ConfluenceAPI().auth = HTTPBasicAuth(user, token)
-
-    def update(self, filters=[], force=False):
+    def update(self, file_paths: List[str], force=False):
         """Represent the function to update documents.
 
         Keyword Arguments:
@@ -34,65 +32,72 @@ class ConfluenceWrapper(metaclass=Singleton):
             (default: {False})
         """
 
-        # parse the full path of the doc folder
-        doc_path = full_path(path='doc')
-        # iterate the doc lists
-        for file_name in [item[:-3] for item in glob.glob1(doc_path, '*.md')]:
-            if not filters or file_name in filters:
-                # load mardown text
-                md_full_text = file_loader(os.path.join(doc_path, f'{file_name}.md'))
-                symbol_text = list(filter(None, md_full_text.splitlines()))[-1]
-                # The last line of each single markdown doc would need to specify
-                # the confluence space name and the parent page ID.
-                # e.g., @MAR#P854425601
-                # @MAR means: "MAR" space
-                # #P854425601 means: the parent page id (854425601)
-                searched_ctx = re.search(r'^@(\w+)#P(\d+)', symbol_text, re.IGNORECASE)
-                if searched_ctx:
-                    space_name = searched_ctx[1]
-                    parent_page_id = int(searched_ctx[2])
-                else:
-                    raise GErrroNotFound(message=f'Not found page symbol: {file_name}')
-                    continue
+        for doc_file in file_paths:
 
-                # convert embedded image into attachment marco format
-                # if the 'force' parameter was specified, the attached images would be
-                # uploaded/updated to the page attachments.
-                doc_content, images = self.resolve_ref_image(content=md_full_text)
+            doc_name = os.path.basename(os.path.splitext(doc_file)[0])
 
-                print(images)
-                # convert markdown text into xhtml format
-                doc_content = markdown.markdown(doc_content,
-                                                extensions=['extra'],
-                                                output_format='xhtml')
+            # load mardown text
+            doc_text = file_loader(doc_file)
 
-                # get confluence page title
-                title = file_name.replace('_', ' ')
+            doc_text_lines = list(filter(None, doc_text.splitlines()))
 
-                page_metadata = ConfluenceAPI().create_or_update_page(title=title,
-                                                                      parent_page_id=parent_page_id,
-                                                                      space=space_name,
-                                                                      xhtml=doc_content)
-                if force:
-                    # get existing attachment lists
-                    attachments = ConfluenceAPI().get_attachments(page_id=page_metadata['id'])
-                    # update attachment
-                    for image in images:
-                        base_name = os.path.basename(image)
-                        image_path = full_path(os.path.join('doc', image))
-                        media_id = attachments.get(base_name, None)
-                        if media_id:
-                            # remove the old version attachment
-                            # this is a known issue that the media could not display correctly
-                            # when updating a new revision to override. We would need to delete
-                            # the attachment before uploading a new version.
-                            ConfluenceAPI().remove_attachment(media_id=media_id)
+            symbol_text = doc_text_lines.pop()
 
-                        # upload the new version of the attached media
-                        ConfluenceAPI().update_attachment(page_id=page_metadata['id'],
-                                                          file_name=base_name,
-                                                          file_path=image_path,
-                                                          attachment_id=attachments.get(base_name, None))
+            print(symbol_text)
+            print(symbol_text)
+            print(symbol_text)
+
+            reformat_full_text = f"{os.linesep}".join(doc_text_lines)
+            # The last line of each single markdown doc would need to specify
+            # the confluence space name and the parent page ID.
+            # e.g., @MAR#P854425601
+            # @MAR means: "MAR" space
+            # #P854425601 means: the parent page id (854425601)
+            searched_ctx = re.search(r'^@(\w+)#P(\d+)', symbol_text, re.IGNORECASE)
+            if searched_ctx:
+                space_name = searched_ctx[1]
+                parent_page_id = int(searched_ctx[2])
+            else:
+                raise GErrroNotFound(message=f'Not found page symbol: {doc_name}')
+                continue
+
+            # convert embedded image into attachment marco format
+            # if the 'force' parameter was specified, the attached images would be
+            # uploaded/updated to the page attachments.
+            doc_content, images = self.resolve_ref_image(content=reformat_full_text)
+
+            # convert markdown text into xhtml format
+            doc_content = markdown.markdown(doc_content,
+                                            extensions=['extra'],
+                                            output_format='xhtml')
+
+            # get confluence page title
+            title = doc_name.replace('_', ' ')
+
+            page_metadata = ConfluenceAPI().create_or_update_page(title=title,
+                                                                  parent_page_id=parent_page_id,
+                                                                  space=space_name,
+                                                                  xhtml=doc_content)
+            if force:
+                # get existing attachment lists
+                attachments = ConfluenceAPI().get_attachments(page_id=page_metadata['id'])
+                # update attachment
+                for image in images:
+                    base_name = os.path.basename(image)
+                    image_path = full_path(os.path.join('doc', image))
+                    media_id = attachments.get(base_name, None)
+                    if media_id:
+                        # remove the old version attachment
+                        # this is a known issue that the media could not display correctly
+                        # when updating a new revision to override. We would need to delete
+                        # the attachment before uploading a new version.
+                        ConfluenceAPI().remove_attachment(media_id=media_id)
+
+                    # upload the new version of the attached media
+                    ConfluenceAPI().update_attachment(page_id=page_metadata['id'],
+                                                      file_name=base_name,
+                                                      file_path=image_path,
+                                                      attachment_id=attachments.get(base_name, None))
 
     def resolve_ref_image(self, content):
         """Go through all doc content, resolve the image elements with

@@ -7,8 +7,6 @@ import wrapt
 from .utils.singleton import Singleton
 from .utils.exception import GErrorConfluenceAPIOffline
 
-CONFLUENCE_API_URL = 'https://voteb.atlassian.net/wiki/rest/api'
-
 MAX_RETRY_TIMES = 3
 
 ARG_ARGUMENT = 'argument'
@@ -24,14 +22,16 @@ ARG_VERSION = 'version'
 def call_confluence_api(wrapped, instance, args, kwargs):
     result = {'text': None}
     if wrapped.__name__ == 'search':
-        url = f'{CONFLUENCE_API_URL}/content/search?cql=({kwargs[ARG_CQL]})'
+        url = f'{instance.url}/content/search?cql=({kwargs[ARG_CQL]})'
     else:
-        url = f'{CONFLUENCE_API_URL}/{wrapped.__name__}'
+        url = f'{instance.url}/{wrapped.__name__}'
         if args:
             url = f'{url}/{"/".join(args)}'
 
     # append custom headers for requrests
-    header = {}  # ConfluenceHelper().header
+    header = {
+        "Authorization": f"Bearer {instance.token}"
+    }  # ConfluenceHelper().header
     if ARG_HEADERS in kwargs:
         header.update(kwargs[ARG_HEADERS])
 
@@ -45,8 +45,8 @@ def call_confluence_api(wrapped, instance, args, kwargs):
                 data=json.dumps(kwargs.get(ARG_PAYLOAD)) if ARG_PAYLOAD in kwargs else None,
                 params=kwargs.get(ARG_ARGUMENT, None),
                 files=kwargs.get(ARG_FILES, None),
-                headers=header,
-                auth=instance.auth)
+                headers=header)
+            print(result)
             result.raise_for_status()
             break
         except Exception as e:
@@ -60,8 +60,10 @@ def call_confluence_api(wrapped, instance, args, kwargs):
 
 
 class ConfluenceAPI(metaclass=Singleton):
-    def __init__(self):
-        self.auth = None
+
+    def __init__(self, url: str, token: str):
+        self.token = token
+        self.url = url
 
     @call_confluence_api
     def content(self, *args, **kwargs):
