@@ -12,7 +12,7 @@ setup(
     keywords=['confluence', 'markdown'],   # Keywords that define your package best
     packages=find_packages(),
     install_requires=[            # I get to this in a second
-        'requests>=2.27.*',
+        'requests>=2.27.1',
         'markdown>=3.3.6',
         'wrapt>=1.14.0'
     ],
