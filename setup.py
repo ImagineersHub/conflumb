@@ -2,9 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='conflumb',         # How you named your package folder (MyLib)
-    version='0.1.1',      # Start with a small number and increase it with every change you make
+    version='0.1.2',      # Start with a small number and increase it with every change you make
     license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
     description='Convert markdown document to confluence page',   # Give a short description about your library
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
     author='esunvoteb',                   # Type in your name
     author_email='esun@voteb.com',      # Type in your E-Mail
     url='https://github.com/ImagineersHub/conflumb',   # Provide either the link to your github or to your website
